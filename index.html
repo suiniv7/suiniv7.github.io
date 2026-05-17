@@ -407,6 +407,34 @@ hr{border:none;border-top:1px solid var(--border);margin:12px 0}
   font-size:.75rem; font-weight:700; padding:5px 12px; border-radius:5px;
   cursor:pointer;
 }
+
+/* VENDAS */
+.venda-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 80px 100px 110px auto;
+  gap: 8px;
+  align-items: end;
+  margin-bottom: 8px;
+}
+@media(max-width:700px) {
+  .venda-form-row { grid-template-columns: 1fr 1fr; }
+}
+.vendas-summary {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.venda-tag {
+  background: var(--green-light);
+  color: var(--green);
+  border: 1px solid rgba(26,107,60,.15);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: .75rem;
+  font-weight: 600;
+  font-family: var(--mono);
+}
 </style>
 
 <!-- Firebase -->
@@ -511,15 +539,16 @@ hr{border:none;border-top:1px solid var(--border);margin:12px 0}
 
   async function loadAllFromFirestore() {
     try {
-      const [fils, pedidos, subs, printers, cfgDocs] = await Promise.all([
+      const [fils, pedidos, subs, printers, cfgDocs, vendas] = await Promise.all([
         loadCol('filamentos'), loadCol('pedidos'), loadCol('subs'),
-        loadCol('printers'),   loadCol('config')
+        loadCol('printers'),   loadCol('config'),  loadCol('vendas')
       ]);
       // Override local DB with cloud data
       localStorage.setItem('p3_fils',     JSON.stringify(fils));
       localStorage.setItem('p3_peds',     JSON.stringify(pedidos));
       localStorage.setItem('p3_subs',     JSON.stringify(subs));
       localStorage.setItem('p3_printers', JSON.stringify(printers));
+      localStorage.setItem('p3_vendas',   JSON.stringify(vendas));
       if (cfgDocs.length > 0) {
         const cfg = cfgDocs[0];
         delete cfg.id;
@@ -613,6 +642,7 @@ hr{border:none;border-top:1px solid var(--border);margin:12px 0}
     <button onclick="showTab('metas')">Metas & Gastos</button>
     <button onclick="showTab('impressoras')">Impressoras</button>
     <button onclick="showTab('filamentos')">Filamentos</button>
+    <button onclick="showTab('vendas')">Vendas</button>
     <button onclick="showTab('config')">Config</button>
   </nav>
 </header>
@@ -1016,6 +1046,67 @@ hr{border:none;border-top:1px solid var(--border);margin:12px 0}
   <div id="fil-empty" class="empty" style="display:none"><span class="ei">🧵</span><p>Nenhum filamento cadastrado.</p></div>
 </div>
 
+
+<!-- ═══ VENDAS ═══ -->
+<div id="tab-vendas" class="tab">
+  <div class="ph"><h1>Vendas</h1><p>Registre cada venda individual — receita contada pela data real</p></div>
+
+  <!-- QUICK ADD -->
+  <div class="card" style="margin-bottom:18px">
+    <div class="card-head">
+      <span class="card-title">Registrar venda</span>
+    </div>
+    <div class="card-body">
+      <div class="fgrid" style="margin-bottom:12px">
+        <div class="fg"><label>Data da venda</label><input type="text" id="v-data" placeholder="DD/MM/AAAA"></div>
+        <div class="fg"><label>Cliente</label><input type="text" id="v-cliente" placeholder="Ex: João Silva"></div>
+        <div class="fg"><label>Produto</label><input type="text" id="v-produto" placeholder="Ex: Chaveiro Volvo"></div>
+        <div class="fg"><label>Quantidade</label><input type="number" id="v-qtd" placeholder="1" min="1" value="1"></div>
+        <div class="fg"><label>Valor unitário (R$)</label><input type="number" id="v-valor" placeholder="0.00" step="0.01"></div>
+        <div class="fg"><label>Vincular a pedido (opcional)</label>
+          <select id="v-pedido">
+            <option value="">— nenhum —</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <button class="btn btn-green" onclick="addVenda()">+ Registrar venda</button>
+        <div id="v-total-preview" style="font-family:var(--mono);font-size:.85rem;color:var(--muted)"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FILTERS -->
+  <div class="fr">
+    <span class="fr-lbl">Mês</span>
+    <select id="v-month-filter" onchange="renderVendas()" style="width:auto">
+      <option value="all">Todos</option>
+    </select>
+    <span class="fr-lbl" style="margin-left:8px">Cliente</span>
+    <input type="text" id="v-cliente-filter" placeholder="Filtrar por cliente..." oninput="renderVendas()" style="width:160px">
+  </div>
+
+  <!-- SUMMARY -->
+  <div id="v-summary" class="vendas-summary"></div>
+
+  <!-- TABLE -->
+  <div class="card">
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr>
+          <th>Data</th><th>Cliente</th><th>Produto</th>
+          <th>Qtd</th><th>Vlr Un.</th><th>Total</th><th>Pedido vinc.</th><th></th>
+        </tr></thead>
+        <tbody id="v-tbody"></tbody>
+      </table>
+    </div>
+    <div id="v-empty" class="empty" style="display:none">
+      <span class="ei">💰</span>
+      <p>Nenhuma venda registrada ainda. Use o formulário acima para registrar suas vendas!</p>
+    </div>
+  </div>
+</div>
+
 <!-- ═══ CONFIG ═══ -->
 <div id="tab-config" class="tab">
   <div class="ph"><h1>Configurações</h1><p>Valores padrão do sistema</p></div>
@@ -1123,6 +1214,8 @@ function _setAndSync(lsKey, colName, newArr, oldArr) {
 
 const DB = {
   get fils()      { return JSON.parse(localStorage.getItem('p3_fils')  ||'[]'); },
+  get vendas()    { return JSON.parse(localStorage.getItem('p3_vendas')||'[]'); },
+  set vendas(v)   { _setAndSync('p3_vendas', 'vendas', v, DB.vendas); },
   set fils(v)     { _setAndSync('p3_fils',     'filamentos', v, DB.fils); },
   get pedidos()   { return JSON.parse(localStorage.getItem('p3_peds')  ||'[]'); },
   set pedidos(v)  { _setAndSync('p3_peds',     'pedidos',    v, DB.pedidos); },
@@ -1151,7 +1244,7 @@ function toast(msg) {
 }
 
 // ══════════ TABS ══════════
-const TABS=['dashboard','pedidos','calcular','metas','impressoras','filamentos','config'];
+const TABS=['dashboard','pedidos','calcular','metas','impressoras','filamentos','vendas','config'];
 function showTab(name) {
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
@@ -1162,6 +1255,7 @@ function showTab(name) {
   if(name==='filamentos') renderFils();
   if(name==='impressoras')renderPrinters();
   if(name==='config')     { loadConfig(); updateConfigAccountPanel(); }
+  if(name==='vendas')     { initVendasTab(); renderVendas(); }
   if(name==='calcular')   initCalc();
   if(name==='metas')      renderMetas();
 }
@@ -1764,7 +1858,16 @@ function delPedido(id){
 function renderDashboard(){
   const month=document.getElementById('dash-month').value;
   const list=filterPeds(month);
-  const receita=list.reduce((s,p)=>s+(p.precoFinal||p.precoConsumidor||0),0);
+  // Include vendas avulsas in receita
+  const vendasMes = DB.vendas.filter(v => {
+    if (!v.data) return false;
+    const pts = v.data.split('/');
+    if (pts.length !== 3) return false;
+    if (month === 'all') return true;
+    return pts[2]+'-'+pts[1] === month;
+  });
+  const receitaVendas = vendasMes.reduce((s,v)=>s+v.total,0);
+  const receita=list.reduce((s,p)=>s+(p.precoFinal||p.precoConsumidor||0),0) + receitaVendas;
   const custo  =list.reduce((s,p)=>s+(p.custoTotal||0),0);
   const lucroB =list.reduce((s,p)=>s+(p.lucroBruto||0),0);
   const lucroL =list.reduce((s,p)=>s+(p.lucroRealLiq??p.lucroLiq??0),0);
@@ -2204,6 +2307,127 @@ function saveEditPrinter() {
   closeEditPrinter();
   renderPrinters(); rebuildPrinterSelect();
   toast('✅ Impressora atualizada!');
+}
+
+
+// ══════════ VENDAS ══════════
+function initVendasTab() {
+  document.getElementById('v-data').value = today();
+  // Populate pedido select
+  const ps = DB.pedidos;
+  const sel = document.getElementById('v-pedido');
+  sel.innerHTML = '<option value="">— nenhum —</option>' +
+    ps.map(p => `<option value="${p.id}">${p.nome} (${p.data||''})</option>`).join('');
+  // Populate month filter
+  const vendas = DB.vendas;
+  const months = new Set();
+  vendas.forEach(v => {
+    if (v.data) {
+      const pts = v.data.split('/');
+      if (pts.length === 3) months.add(pts[2]+'-'+pts[1]);
+    }
+  });
+  const mSel = document.getElementById('v-month-filter');
+  const prev = mSel.value;
+  mSel.innerHTML = '<option value="all">Todos</option>';
+  Array.from(months).sort().reverse().forEach(m => {
+    const [y,mo] = m.split('-');
+    const lbl = new Date(y, parseInt(mo)-1).toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
+    mSel.innerHTML += `<option value="${m}">${lbl}</option>`;
+  });
+  if (prev) mSel.value = prev;
+
+  // Live total preview
+  const qtdEl = document.getElementById('v-qtd');
+  const valEl = document.getElementById('v-valor');
+  const preview = document.getElementById('v-total-preview');
+  const update = () => {
+    const t = (parseFloat(qtdEl.value)||0) * (parseFloat(valEl.value)||0);
+    preview.textContent = t > 0 ? 'Total: ' + R(t) : '';
+  };
+  qtdEl.oninput = update;
+  valEl.oninput = update;
+}
+
+function addVenda() {
+  const data    = document.getElementById('v-data').value.trim();
+  const cliente = document.getElementById('v-cliente').value.trim();
+  const produto = document.getElementById('v-produto').value.trim();
+  const qtd     = parseInt(document.getElementById('v-qtd').value)||1;
+  const valor   = parseFloat(document.getElementById('v-valor').value)||0;
+  const pedId   = document.getElementById('v-pedido').value;
+
+  if (!data||!produto||!valor) { toast('⚠️ Preencha data, produto e valor'); return; }
+
+  const pedNome = pedId ? (DB.pedidos.find(p=>p.id===pedId)?.nome||'') : '';
+  const vs = DB.vendas;
+  vs.unshift({ id:uid(), data, cliente, produto, qtd, valor, total:qtd*valor, pedId, pedNome });
+  DB.vendas = vs;
+
+  document.getElementById('v-cliente').value = '';
+  document.getElementById('v-produto').value = '';
+  document.getElementById('v-qtd').value = '1';
+  document.getElementById('v-valor').value = '';
+  document.getElementById('v-total-preview').textContent = '';
+  document.getElementById('v-data').value = today();
+
+  renderVendas();
+  renderDashboard();
+  toast('✅ Venda registrada!');
+}
+
+function delVenda(id) {
+  if (!confirm('Remover esta venda?')) return;
+  DB.vendas = DB.vendas.filter(v => v.id !== id);
+  renderVendas();
+  renderDashboard();
+  toast('🗑️ Removida');
+}
+
+function renderVendas() {
+  const month = document.getElementById('v-month-filter')?.value||'all';
+  const clienteFilter = (document.getElementById('v-cliente-filter')?.value||'').toLowerCase();
+  let vs = DB.vendas;
+
+  if (month !== 'all') {
+    vs = vs.filter(v => {
+      if (!v.data) return false;
+      const pts = v.data.split('/');
+      return pts.length===3 && pts[2]+'-'+pts[1]===month;
+    });
+  }
+  if (clienteFilter) {
+    vs = vs.filter(v => (v.cliente||'').toLowerCase().includes(clienteFilter));
+  }
+
+  const tbody = document.getElementById('v-tbody');
+  const empty = document.getElementById('v-empty');
+  const summary = document.getElementById('v-summary');
+
+  // Summary
+  const totalReceita = vs.reduce((s,v)=>s+v.total,0);
+  const totalQtd = vs.reduce((s,v)=>s+v.qtd,0);
+  if (summary) {
+    summary.innerHTML = vs.length > 0 ? `
+      <span class="venda-tag">${vs.length} venda${vs.length!==1?'s':''}</span>
+      <span class="venda-tag">${totalQtd} unidades</span>
+      <span class="venda-tag">${R(totalReceita)} total</span>
+    ` : '';
+  }
+
+  if (!vs.length) { tbody.innerHTML=''; empty.style.display='block'; return; }
+  empty.style.display='none';
+
+  tbody.innerHTML = vs.map(v => `<tr>
+    <td class="mc">${v.data||'—'}</td>
+    <td>${v.cliente||'—'}</td>
+    <td><strong>${v.produto}</strong></td>
+    <td class="mc">${v.qtd}</td>
+    <td class="mc">${R(v.valor)}</td>
+    <td class="mc" style="color:var(--green);font-weight:600">${R(v.total)}</td>
+    <td style="font-size:.75rem;color:var(--muted)">${v.pedNome||'—'}</td>
+    <td><button class="btn-del" onclick="delVenda('${v.id}')">✕</button></td>
+  </tr>`).join('');
 }
 
 // ══════════ SLICER ANALYZER ══════════
