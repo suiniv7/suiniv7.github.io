@@ -1633,6 +1633,24 @@ function setStatus(pedId, newStatus) {
 }
 
 
+
+function editarValorCobrado(pedId) {
+  const ps = DB.pedidos;
+  const idx = ps.findIndex(p => p.id === pedId);
+  if (idx === -1) return;
+  const p = ps[idx];
+  const novoValor = prompt('Valor cobrado atual: R$ ' + Number(p.precoFinal||p.precoConsumidor||0).toFixed(2).replace('.',',') + '\n\nDigite o novo valor (R$):', Number(p.precoFinal||p.precoConsumidor||0).toFixed(2));
+  if (novoValor === null) return;
+  const val = parseFloat(novoValor.replace(',','.'));
+  if (isNaN(val) || val < 0) { toast('⚠️ Valor inválido'); return; }
+  ps[idx].precoFinal = val;
+  ps[idx].lucroRealLiq = val - (ps[idx].custoTotal||0);
+  ps[idx].lucroBruto = val - (ps[idx].custoUn||0);
+  DB.pedidos = ps;
+  renderPedidos();
+  renderDashboard();
+  toast('✅ Valor atualizado para ' + 'R$ ' + val.toFixed(2).replace('.',','));
+}
 function descontarEstoque(pedId) {
   const ps = DB.pedidos;
   const idx = ps.findIndex(p=>p.id===pedId);
@@ -1722,7 +1740,9 @@ function renderPedidos(){
       </td>
       <td style="font-size:.76rem">${p.impressoraNome||'—'}</td>
       <td class="mc">${R(p.custoTotal)}</td>
-      <td class="mc" style="color:${p.precoFinal&&p.precoFinal!==p.precoConsumidor?'var(--blue)':'inherit'}">${R(p.precoFinal||p.precoConsumidor)}</td>
+      <td class="mc"><div style="display:flex;align-items:center;gap:4px"><span style="color:${p.precoFinal&&p.precoFinal!==p.precoConsumidor?'var(--blue)':'inherit'}">${R(p.precoFinal||p.precoConsumidor)}</span>
+          <button onclick="editarValorCobrado('${p.id}')" title="Editar valor cobrado" style="background:none;border:none;cursor:pointer;font-size:.75rem;color:var(--muted);padding:2px 4px;border-radius:4px" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--muted)'">✏️</button>
+        </div></td>
       <td class="${cls}">${R(lucroMostrar)}</td>
       <td>
         ${p.estoqueDescontado
