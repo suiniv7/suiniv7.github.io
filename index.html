@@ -1019,6 +1019,22 @@ hr{border:none;border-top:1px solid var(--border);margin:12px 0}
 <!-- ═══ CONFIG ═══ -->
 <div id="tab-config" class="tab">
   <div class="ph"><h1>Configurações</h1><p>Valores padrão do sistema</p></div>
+
+  <div class="card" style="margin-bottom:20px;border-left:4px solid var(--accent)">
+    <div class="card-head"><span class="card-title">Minha Conta</span></div>
+    <div class="card-body" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+      <img id="cfg-avatar" src="" style="width:48px;height:48px;border-radius:50%;display:none;border:2px solid var(--border)">
+      <div style="flex:1">
+        <div id="cfg-user-name" style="font-weight:700;font-size:1rem"></div>
+        <div id="cfg-user-email" style="font-size:.78rem;color:var(--muted);margin-top:2px"></div>
+        <div id="cfg-user-type" style="font-size:.72rem;margin-top:4px"></div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button id="cfg-btn-google" onclick="upgradeToGoogle()" style="display:none" class="btn btn-blue btn-sm">🔑 Salvar com Google</button>
+        <button onclick="doLogoutAndRedirect()" class="btn btn-sm" style="background:rgba(200,75,31,.1);color:var(--accent);border:1px solid rgba(200,75,31,.2)">🚪 Sair da conta</button>
+      </div>
+    </div>
+  </div>
   <div class="card" style="max-width:560px">
     <div class="card-head"><span class="card-title">Padrões</span></div>
     <div class="card-body">
@@ -1145,7 +1161,7 @@ function showTab(name) {
   if(name==='pedidos')    renderPedidos();
   if(name==='filamentos') renderFils();
   if(name==='impressoras')renderPrinters();
-  if(name==='config')     loadConfig();
+  if(name==='config')     { loadConfig(); updateConfigAccountPanel(); }
   if(name==='calcular')   initCalc();
   if(name==='metas')      renderMetas();
 }
@@ -1180,6 +1196,33 @@ function toggleUserMenu() {
       }
     }), 10);
   }
+}
+
+function doLogoutAndRedirect() {
+  if (confirm('Deseja sair da sua conta?')) {
+    window._FB.signOut(window._FB.auth);
+  }
+}
+
+function updateConfigAccountPanel() {
+  const user = window._currentUser;
+  if (!user) return;
+  const isAnon = user.isAnonymous;
+  const nameEl  = document.getElementById('cfg-user-name');
+  const emailEl = document.getElementById('cfg-user-email');
+  const typeEl  = document.getElementById('cfg-user-type');
+  const avatarEl= document.getElementById('cfg-avatar');
+  const btnGoogle=document.getElementById('cfg-btn-google');
+  if (nameEl)  nameEl.textContent  = isAnon ? 'Visitante' : (user.displayName || 'Usuário');
+  if (emailEl) emailEl.textContent = isAnon ? '' : (user.email || '');
+  if (typeEl)  typeEl.innerHTML    = isAnon
+    ? '<span style="color:var(--warn)">⚠️ Modo visitante — dados não salvos na nuvem</span>'
+    : '<span style="color:var(--green)">✅ Conta Google — dados salvos na nuvem</span>';
+  if (avatarEl) {
+    if (!isAnon && user.photoURL) { avatarEl.src=user.photoURL; avatarEl.style.display='block'; }
+    else avatarEl.style.display='none';
+  }
+  if (btnGoogle) btnGoogle.style.display = isAnon ? 'block' : 'none';
 }
 function togglePrinterPayFields() {
   const s = document.getElementById('p-status').value;
