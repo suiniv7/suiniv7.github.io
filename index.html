@@ -1858,7 +1858,7 @@ function delPedido(id){
 function renderDashboard(){
   const month=document.getElementById('dash-month').value;
   const list=filterPeds(month);
-  // Include vendas avulsas in receita
+  // Receita = apenas vendas registradas manualmente (não pedidos)
   const vendasMes = DB.vendas.filter(v => {
     if (!v.data) return false;
     const pts = v.data.split('/');
@@ -1866,11 +1866,12 @@ function renderDashboard(){
     if (month === 'all') return true;
     return pts[2]+'-'+pts[1] === month;
   });
-  const receitaVendas = vendasMes.reduce((s,v)=>s+v.total,0);
-  const receita=list.reduce((s,p)=>s+(p.precoFinal||p.precoConsumidor||0),0) + receitaVendas;
-  const custo  =list.reduce((s,p)=>s+(p.custoTotal||0),0);
-  const lucroB =list.reduce((s,p)=>s+(p.lucroBruto||0),0);
-  const lucroL =list.reduce((s,p)=>s+(p.lucroRealLiq??p.lucroLiq??0),0);
+  const receita = vendasMes.reduce((s,v) => s + v.total, 0);
+  // Custo = soma dos pedidos do período (custo de produção)
+  const custo  = list.reduce((s,p) => s+(p.custoTotal||0), 0);
+  // Lucro = receita das vendas - custo de produção dos pedidos
+  const lucroB = receita - custo;
+  const lucroL = receita - custo;
 
   // KG return calculation
   const totalGramasPed = list.reduce((s,p)=>s+(p.totalGramas||0),0);
@@ -1887,10 +1888,10 @@ function renderDashboard(){
   }
 
   document.getElementById('dash-stats').innerHTML=`
-    <div class="stat"><div class="stat-lbl">Receita cobrada</div><div class="stat-val blue">${R(receita)}</div><div class="stat-sub">${list.length} pedido${list.length!==1?'s':''}</div></div>
-    <div class="stat"><div class="stat-lbl">Custo Real Total</div><div class="stat-val red">${R(custo)}</div><div class="stat-sub">todos os custos</div></div>
-    <div class="stat"><div class="stat-lbl">Lucro Bruto</div><div class="stat-val green">${R(lucroB)}</div><div class="stat-sub">antes de taxas</div></div>
-    <div class="stat"><div class="stat-lbl">Lucro Líquido</div><div class="stat-val ${lucroL>=0?'green':'red'}">${R(lucroL)}</div><div class="stat-sub">após impostos e cartão</div></div>`;
+    <div class="stat"><div class="stat-lbl">Receita (vendas)</div><div class="stat-val blue">${R(receita)}</div><div class="stat-sub">${vendasMes.length} venda${vendasMes.length!==1?'s':''}</div></div>
+    <div class="stat"><div class="stat-lbl">Custo de Produção</div><div class="stat-val red">${R(custo)}</div><div class="stat-sub">${list.length} pedido${list.length!==1?'s':''} produzidos</div></div>
+    <div class="stat"><div class="stat-lbl">Lucro Bruto</div><div class="stat-val ${lucroB>=0?'green':'red'}">${R(lucroB)}</div><div class="stat-sub">vendas − custo produção</div></div>
+    <div class="stat"><div class="stat-lbl">Lucro Líquido</div><div class="stat-val ${lucroL>=0?'green':'red'}">${R(lucroL)}</div><div class="stat-sub">após custos</div></div>`;
 
   // KG indicator card
   const kgBar = document.getElementById('dash-kg-bar');
