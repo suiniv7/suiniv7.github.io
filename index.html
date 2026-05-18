@@ -2810,28 +2810,33 @@ function renderMetas(){renderSubList();renderMetaBreakdown();calcPayoff();calcGp
 function loadConfig(){
   const cfg=DB.cfg;
   document.getElementById('cfg-markup').value=cfg.markup||5;
-  document.getElementById('cfg-watts').value=cfg.watts||1300;
   document.getElementById('cfg-kwh').value=cfg.kwh||1.16;
   document.getElementById('cfg-falhas').value=cfg.falhas||5;
-  document.getElementById('cfg-vida').value=cfg.vida||20000;
-  document.getElementById('cfg-maquina').value=cfg.maquina||5000;
   document.getElementById('cfg-cartao').value=cfg.cartao||0;
   document.getElementById('cfg-imposto').value=cfg.imposto||0;
   document.getElementById('cfg-lucro-desejado').value=cfg.lucroDesejado||500;
   document.getElementById('cfg-reserva-pct').value=cfg.reservaPct||10;
+  const studioEl=document.getElementById('cfg-studio');
+  const descEl=document.getElementById('cfg-desc');
+  if(studioEl) studioEl.value=cfg.studio||'';
+  if(descEl) descEl.value=cfg.desc||'';
 }
 function saveConfig(){
+  const prev = DB.cfg;
   DB.cfg={
-    markup:parseFloat(document.getElementById('cfg-markup').value)||5,
-    watts:parseFloat(document.getElementById('cfg-watts').value)||1300,
-    kwh:parseFloat(document.getElementById('cfg-kwh').value)||1.16,
-    falhas:parseFloat(document.getElementById('cfg-falhas').value)||5,
-    vida:parseFloat(document.getElementById('cfg-vida').value)||20000,
-    maquina:parseFloat(document.getElementById('cfg-maquina').value)||5000,
-    cartao:parseFloat(document.getElementById('cfg-cartao').value)||0,
-    imposto:parseFloat(document.getElementById('cfg-imposto').value)||0,
-    lucroDesejado:parseFloat(document.getElementById('cfg-lucro-desejado').value)||500,
-    reservaPct:parseFloat(document.getElementById('cfg-reserva-pct').value)||10,
+    markup:  parseFloat(document.getElementById('cfg-markup').value)||5,
+    kwh:     parseFloat(document.getElementById('cfg-kwh').value)||1.16,
+    falhas:  parseFloat(document.getElementById('cfg-falhas').value)||5,
+    cartao:  parseFloat(document.getElementById('cfg-cartao').value)||0,
+    imposto: parseFloat(document.getElementById('cfg-imposto').value)||0,
+    lucroDesejado: parseFloat(document.getElementById('cfg-lucro-desejado').value)||500,
+    reservaPct:    parseFloat(document.getElementById('cfg-reserva-pct').value)||10,
+    studio: document.getElementById('cfg-studio')?.value||'',
+    desc:   document.getElementById('cfg-desc')?.value||'',
+    // keep old fields that other parts still use
+    watts:   prev.watts||1300,
+    vida:    prev.vida||20000,
+    maquina: prev.maquina||5000,
   };
   toast('✅ Configurações salvas!'); renderMetas();
 }
