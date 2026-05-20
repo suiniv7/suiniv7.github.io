@@ -435,6 +435,120 @@ hr{border:none;border-top:1px solid var(--border);margin:12px 0}
   font-weight: 600;
   font-family: var(--mono);
 }
+
+/* NOTAS WIDGET */
+#notas-btn {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 52px;
+  height: 52px;
+  background: var(--text);
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  box-shadow: 0 4px 20px rgba(0,0,0,.25);
+  z-index: 400;
+  transition: all .2s;
+}
+#notas-btn:hover { transform: scale(1.08); background: var(--accent); }
+#notas-badge {
+  position: absolute;
+  top: -2px; right: -2px;
+  background: var(--accent);
+  color: #fff;
+  font-size: .6rem;
+  font-weight: 700;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--mono);
+}
+#notas-panel {
+  position: fixed;
+  bottom: 86px;
+  right: 24px;
+  width: 340px;
+  max-height: 520px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 8px 40px rgba(0,0,0,.15);
+  z-index: 401;
+  display: none;
+  flex-direction: column;
+  overflow: hidden;
+}
+.notas-header {
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.notas-title {
+  font-weight: 800;
+  font-size: .92rem;
+}
+.notas-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 10px;
+}
+.nota-item {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  position: relative;
+  transition: border-color .15s;
+}
+.nota-item:hover { border-color: var(--accent); }
+.nota-item-title {
+  font-weight: 700;
+  font-size: .84rem;
+  margin-bottom: 4px;
+  padding-right: 20px;
+}
+.nota-item-text {
+  font-size: .78rem;
+  color: var(--muted);
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+.nota-item-date {
+  font-size: .65rem;
+  color: var(--muted);
+  margin-top: 5px;
+  font-family: var(--mono);
+}
+.notas-add {
+  padding: 10px;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+}
+.notas-add textarea {
+  width: 100%;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 8px 10px;
+  font-family: var(--sans);
+  font-size: .82rem;
+  resize: none;
+  outline: none;
+  color: var(--text);
+  transition: border-color .15s;
+  height: 70px;
+}
+.notas-add textarea:focus { border-color: var(--accent); }
 </style>
 
 <!-- Firebase -->
@@ -539,9 +653,9 @@ hr{border:none;border-top:1px solid var(--border);margin:12px 0}
 
   async function loadAllFromFirestore() {
     try {
-      const [fils, pedidos, subs, printers, cfgDocs, vendas, clientesArr] = await Promise.all([
+      const [fils, pedidos, subs, printers, cfgDocs, vendas, clientesArr, notasArr] = await Promise.all([
         loadCol('filamentos'), loadCol('pedidos'), loadCol('subs'),
-        loadCol('printers'),   loadCol('config'),  loadCol('vendas'), loadCol('clientes')
+        loadCol('printers'),   loadCol('config'),  loadCol('vendas'), loadCol('clientes'), loadCol('notas')
       ]);
       // Override local DB with cloud data
       localStorage.setItem('p3_fils',     JSON.stringify(fils));
@@ -550,13 +664,14 @@ hr{border:none;border-top:1px solid var(--border);margin:12px 0}
       localStorage.setItem('p3_printers', JSON.stringify(printers));
       localStorage.setItem('p3_vendas',   JSON.stringify(vendas));
       localStorage.setItem('p3_clientes', JSON.stringify(clientesArr));
+      localStorage.setItem('p3_notas', JSON.stringify(notasArr));
       if (cfgDocs.length > 0) {
         const cfg = cfgDocs[0];
         delete cfg.id;
         localStorage.setItem('p3_cfg', JSON.stringify(cfg));
       }
       // Re-render everything
-      populateMonths(); renderDashboard(); renderFils(); renderPrinters(); initCalc();
+      populateMonths(); renderDashboard(); renderFils(); renderPrinters(); initCalc(); updateNotasBadge();
       const metasTab = document.getElementById('tab-metas');
       if (metasTab && metasTab.classList.contains('active')) renderMetas();
     } catch(e) { console.error('Firestore load error:', e); }
@@ -643,7 +758,7 @@ hr{border:none;border-top:1px solid var(--border);margin:12px 0}
     <button onclick="showTab('metas')">Metas & Gastos</button>
     <button onclick="showTab('impressoras')">Impressoras</button>
     <button onclick="showTab('filamentos')">Filamentos</button>
-    <button onclick="showTab('vendas')">Vendas</button>
+    <button onclick="showTab('vendas')">Pedidos</button>
     <button onclick="showTab('clientes')">Clientes</button>
     <button onclick="showTab('config')">Config</button>
   </nav>
@@ -1055,41 +1170,60 @@ hr{border:none;border-top:1px solid var(--border);margin:12px 0}
 </div>
 
 
-<!-- ═══ VENDAS ═══ -->
+<!-- ═══ VENDAS/PEDIDOS ═══ -->
 <div id="tab-vendas" class="tab">
-  <div class="ph"><h1>Vendas</h1><p>Registre cada venda individual — receita contada pela data real</p></div>
+  <div class="ph"><h1>Pedidos</h1><p>Controle completo — igual à sua planilha</p></div>
 
-  <!-- QUICK ADD -->
-  <div class="card" style="margin-bottom:18px">
-    <div class="card-head">
-      <span class="card-title">Registrar venda</span>
-    </div>
+  <!-- ADD FORM -->
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-head"><span class="card-title">Novo pedido</span></div>
     <div class="card-body">
-      <div class="fgrid" style="margin-bottom:12px">
-        <div class="fg"><label>Data da venda</label><input type="text" id="v-data" placeholder="DD/MM/AAAA"></div>
-        <div class="fg"><label>Cliente</label><input type="text" id="v-cliente" placeholder="Ex: João Silva"></div>
-        <div class="fg"><label>Produto</label><input type="text" id="v-produto" placeholder="Ex: Chaveiro Volvo"></div>
-        <div class="fg"><label>Quantidade</label><input type="number" id="v-qtd" placeholder="1" min="1" value="1"></div>
-        <div class="fg"><label>Valor unitário (R$)</label><input type="number" id="v-valor" placeholder="0.00" step="0.01"></div>
-        <div class="fg"><label>Impressora usada</label>
-          <select id="v-impressora">
+      <div class="fgrid" style="margin-bottom:10px">
+        <div class="fg"><label>Data</label>
+          <input type="text" id="v-data" placeholder="DD/MM/AAAA"></div>
+        <div class="fg"><label>Cliente salvo</label>
+          <select id="v-cliente-saved" onchange="preencherCliente()">
             <option value="">— selecionar —</option>
           </select>
         </div>
-        <div class="fg"><label>Vincular a pedido (opcional)</label>
-          <select id="v-pedido">
-            <option value="">— nenhum —</option>
+        <div class="fg"><label>Cliente (nome)</label>
+          <input type="text" id="v-cliente" placeholder="Nome do cliente"></div>
+        <div class="fg"><label>Produto</label>
+          <input type="text" id="v-produto" placeholder="Ex: Chaveiro Volvo"></div>
+        <div class="fg"><label>Quantidade</label>
+          <input type="number" id="v-qtd" value="1" min="1" oninput="calcVendaPreview()"></div>
+        <div class="fg"><label>Valor unitário (R$)</label>
+          <input type="number" id="v-valor" placeholder="0.00" step="0.01" oninput="calcVendaPreview()"></div>
+        <div class="fg"><label>Pago</label>
+          <select id="v-pago">
+            <option value="nao">Não</option>
+            <option value="50">50%</option>
+            <option value="sim">Sim</option>
           </select>
         </div>
-        <div class="fg"><label>Vincular a cliente salvo</label>
-          <select id="v-cliente-saved" onchange="preencherCliente()">
-            <option value="">— novo cliente —</option>
+        <div class="fg"><label>Feito?</label>
+          <select id="v-feito">
+            <option value="nao">Não</option>
+            <option value="sim">Sim</option>
           </select>
+        </div>
+        <div class="fg"><label>Entregue?</label>
+          <select id="v-entregue">
+            <option value="nao">Não</option>
+            <option value="sim">Sim</option>
+          </select>
+        </div>
+        <div class="fg"><label>Impressora</label>
+          <select id="v-impressora"><option value="">— —</option></select>
         </div>
       </div>
+      <div class="fg" style="margin-bottom:10px">
+        <label>Observação</label>
+        <input type="text" id="v-obs" placeholder="Ex: cor específica, referência...">
+      </div>
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-        <button class="btn btn-green" onclick="addVenda()">+ Registrar venda</button>
-        <div id="v-total-preview" style="font-family:var(--mono);font-size:.85rem;color:var(--muted)"></div>
+        <button class="btn btn-green" onclick="addVenda()">+ Adicionar pedido</button>
+        <span id="v-total-preview" style="font-family:var(--mono);font-size:.9rem;color:var(--green);font-weight:600"></span>
       </div>
     </div>
   </div>
@@ -1097,15 +1231,25 @@ hr{border:none;border-top:1px solid var(--border);margin:12px 0}
   <!-- FILTERS -->
   <div class="fr">
     <span class="fr-lbl">Mês</span>
-    <select id="v-month-filter" onchange="renderVendas()" style="width:auto">
+    <select id="v-month-filter" onchange="renderVendas()" style="width:auto"><option value="all">Todos</option></select>
+    <span class="fr-lbl">Pago</span>
+    <select id="v-pago-filter" onchange="renderVendas()" style="width:auto">
       <option value="all">Todos</option>
+      <option value="nao">Não pago</option>
+      <option value="50">50%</option>
+      <option value="sim">Pago</option>
     </select>
-    <span class="fr-lbl" style="margin-left:8px">Cliente</span>
-    <input type="text" id="v-cliente-filter" placeholder="Filtrar por cliente..." oninput="renderVendas()" style="width:160px">
+    <span class="fr-lbl">Feito</span>
+    <select id="v-feito-filter" onchange="renderVendas()" style="width:auto">
+      <option value="all">Todos</option>
+      <option value="nao">Não feito</option>
+      <option value="sim">Feito</option>
+    </select>
+    <input type="text" id="v-cliente-filter" placeholder="Buscar cliente..." oninput="renderVendas()" style="width:150px">
   </div>
 
-  <!-- SUMMARY -->
-  <div id="v-summary" class="vendas-summary"></div>
+  <!-- SUMMARY CARDS -->
+  <div id="v-summary" class="vendas-summary" style="margin-bottom:14px"></div>
 
   <!-- TABLE -->
   <div class="card">
@@ -1113,14 +1257,16 @@ hr{border:none;border-top:1px solid var(--border);margin:12px 0}
       <table>
         <thead><tr>
           <th>Data</th><th>Cliente</th><th>Produto</th>
-          <th>Qtd</th><th>Vlr Un.</th><th>Total</th><th>Pedido vinc.</th><th></th>
+          <th>Qtd</th><th>Vlr Un.</th><th>Total</th>
+          <th>Pago</th><th>Feito?</th><th>Entregue</th>
+          <th>Obs</th><th></th>
         </tr></thead>
         <tbody id="v-tbody"></tbody>
       </table>
     </div>
     <div id="v-empty" class="empty" style="display:none">
-      <span class="ei">💰</span>
-      <p>Nenhuma venda registrada ainda. Use o formulário acima para registrar suas vendas!</p>
+      <span class="ei">📋</span>
+      <p>Nenhum pedido ainda. Adicione seu primeiro pedido acima!</p>
     </div>
   </div>
 </div>
@@ -1239,6 +1385,30 @@ hr{border:none;border-top:1px solid var(--border);margin:12px 0}
     </div>
   </div>
 </div>
+
+<!-- NOTAS WIDGET -->
+<button id="notas-btn" onclick="toggleNotas()" title="Anotações">
+  📝
+  <span id="notas-badge"></span>
+</button>
+<div id="notas-panel">
+  <div class="notas-header">
+    <span class="notas-title">📝 Anotações</span>
+    <button class="btn-del" onclick="toggleNotas()" style="font-size:1.1rem">✕</button>
+  </div>
+  <div class="notas-body" id="notas-list">
+    <div class="empty" style="padding:24px">
+      <span class="ei" style="font-size:1.5rem">📝</span>
+      <p>Nenhuma anotação ainda.</p>
+    </div>
+  </div>
+  <div class="notas-add">
+    <input type="text" id="nota-titulo" placeholder="Título da nota..." style="width:100%;margin-bottom:6px">
+    <textarea id="nota-texto" placeholder="Digite sua anotação..."></textarea>
+    <button class="btn btn-sm" style="width:100%;margin-top:6px" onclick="addNota()">+ Adicionar nota</button>
+  </div>
+</div>
+
 </main>
 <div id="toast"></div>
 
@@ -1263,6 +1433,8 @@ const DB = {
   set vendas(v)   { _setAndSync('p3_vendas', 'vendas', v, DB.vendas); },
   get clientes()  { return JSON.parse(localStorage.getItem('p3_clientes')||'[]'); },
   set clientes(v) { _setAndSync('p3_clientes', 'clientes', v, DB.clientes); },
+  get notas()     { return JSON.parse(localStorage.getItem('p3_notas')||'[]'); },
+  set notas(v)    { _setAndSync('p3_notas', 'notas', v, DB.notas); },
   set fils(v)     { _setAndSync('p3_fils',     'filamentos', v, DB.fils); },
   get pedidos()   { return JSON.parse(localStorage.getItem('p3_peds')  ||'[]'); },
   set pedidos(v)  { _setAndSync('p3_peds',     'pedidos',    v, DB.pedidos); },
@@ -1914,7 +2086,8 @@ function renderDashboard(){
     if (month === 'all') return true;
     return pts[2]+'-'+pts[1] === month;
   });
-  const receita = vendasMes.reduce((s,v) => s + v.total, 0);
+  // Receita = apenas vendas com pago=sim
+  const receita = vendasMes.filter(v=>v.pago==='sim').reduce((s,v) => s + v.total, 0);
   // Custo = soma dos pedidos do período (custo de produção)
   const custo  = list.reduce((s,p) => s+(p.custoTotal||0), 0);
   // Lucro = receita das vendas - custo de produção dos pedidos
@@ -2410,31 +2583,35 @@ function initVendasTab() {
 }
 
 function addVenda() {
-  const data    = document.getElementById('v-data').value.trim();
-  const cliente = document.getElementById('v-cliente').value.trim();
-  const produto = document.getElementById('v-produto').value.trim();
-  const qtd     = parseInt(document.getElementById('v-qtd').value)||1;
-  const valor   = parseFloat(document.getElementById('v-valor').value)||0;
-  const pedId   = document.getElementById('v-pedido').value;
+  const data     = document.getElementById('v-data').value.trim();
+  const cliente  = document.getElementById('v-cliente').value.trim();
+  const produto  = document.getElementById('v-produto').value.trim();
+  const qtd      = parseInt(document.getElementById('v-qtd').value)||1;
+  const valor    = parseFloat(document.getElementById('v-valor').value)||0;
+  const pago     = document.getElementById('v-pago').value;
+  const feito    = document.getElementById('v-feito').value;
+  const entregue = document.getElementById('v-entregue').value;
+  const impressora = document.getElementById('v-impressora')?.value||'';
+  const obs      = document.getElementById('v-obs')?.value.trim()||'';
 
-  if (!data||!produto||!valor) { toast('⚠️ Preencha data, produto e valor'); return; }
+  if (!data||!produto) { toast('⚠️ Preencha data e produto'); return; }
 
-  const pedNome   = pedId ? (DB.pedidos.find(p=>p.id===pedId)?.nome||'') : '';
-  const impressora = document.getElementById('v-impressora')?.value || '';
   const vs = DB.vendas;
-  vs.unshift({ id:uid(), data, cliente, produto, qtd, valor, total:qtd*valor, pedId, pedNome, impressora });
+  vs.unshift({ id:uid(), data, cliente, produto, qtd, valor, total:qtd*valor,
+               pago, feito, entregue, impressora, obs });
   DB.vendas = vs;
 
-  document.getElementById('v-cliente').value = '';
-  document.getElementById('v-produto').value = '';
-  document.getElementById('v-qtd').value = '1';
-  document.getElementById('v-valor').value = '';
-  document.getElementById('v-total-preview').textContent = '';
-  document.getElementById('v-data').value = today();
+  ['v-cliente','v-produto','v-obs'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('v-qtd').value='1';
+  document.getElementById('v-valor').value='';
+  document.getElementById('v-pago').value='nao';
+  document.getElementById('v-feito').value='nao';
+  document.getElementById('v-entregue').value='nao';
+  document.getElementById('v-total-preview').textContent='';
+  document.getElementById('v-data').value=today();
 
-  renderVendas();
-  renderDashboard();
-  toast('✅ Venda registrada!');
+  renderVendas(); renderDashboard();
+  toast('✅ Pedido adicionado!');
 }
 
 function delVenda(id) {
@@ -2445,50 +2622,97 @@ function delVenda(id) {
   toast('🗑️ Removida');
 }
 
+function pagoLabel(p) {
+  if (p==='sim') return '<span style="background:#dcfce7;color:#16a34a;padding:2px 8px;border-radius:100px;font-size:.7rem;font-weight:700">SIM</span>';
+  if (p==='50')  return '<span style="background:#fef3c7;color:#d97706;padding:2px 8px;border-radius:100px;font-size:.7rem;font-weight:700">50%</span>';
+  return '<span style="background:#fee2e2;color:#dc2626;padding:2px 8px;border-radius:100px;font-size:.7rem;font-weight:700">NÃO</span>';
+}
+function simNaoLabel(v, field) {
+  const val = v[field]||'nao';
+  const ok = val==='sim';
+  return `<button onclick="toggleVendaField('${v.id}','${field}')" style="background:${ok?'#dcfce7':'#fee2e2'};color:${ok?'#16a34a':'#dc2626'};border:none;padding:2px 8px;border-radius:100px;font-size:.7rem;font-weight:700;cursor:pointer">${ok?'SIM':'NÃO'}</button>`;
+}
+
+function toggleVendaField(id, field) {
+  const vs = DB.vendas;
+  const idx = vs.findIndex(v=>v.id===id);
+  if (idx===-1) return;
+  if (field==='pago') {
+    const order = ['nao','50','sim'];
+    const cur = vs[idx].pago||'nao';
+    vs[idx].pago = order[(order.indexOf(cur)+1)%3];
+  } else {
+    vs[idx][field] = vs[idx][field]==='sim' ? 'nao' : 'sim';
+  }
+  DB.vendas = vs;
+  renderVendas(); renderDashboard();
+}
+
 function renderVendas() {
   const month = document.getElementById('v-month-filter')?.value||'all';
-  const clienteFilter = (document.getElementById('v-cliente-filter')?.value||'').toLowerCase();
+  const pagoF = document.getElementById('v-pago-filter')?.value||'all';
+  const feitoF = document.getElementById('v-feito-filter')?.value||'all';
+  const clienteF = (document.getElementById('v-cliente-filter')?.value||'').toLowerCase();
   let vs = DB.vendas;
 
-  if (month !== 'all') {
-    vs = vs.filter(v => {
-      if (!v.data) return false;
-      const pts = v.data.split('/');
-      return pts.length===3 && pts[2]+'-'+pts[1]===month;
-    });
-  }
-  if (clienteFilter) {
-    vs = vs.filter(v => (v.cliente||'').toLowerCase().includes(clienteFilter));
-  }
+  if (month!=='all') vs=vs.filter(v=>{
+    if(!v.data)return false;
+    const pts=v.data.split('/');
+    return pts.length===3&&pts[2]+'-'+pts[1]===month;
+  });
+  if (pagoF!=='all')   vs=vs.filter(v=>(v.pago||'nao')===pagoF);
+  if (feitoF!=='all')  vs=vs.filter(v=>(v.feito||'nao')===feitoF);
+  if (clienteF) vs=vs.filter(v=>(v.cliente||'').toLowerCase().includes(clienteF));
 
-  const tbody = document.getElementById('v-tbody');
-  const empty = document.getElementById('v-empty');
-  const summary = document.getElementById('v-summary');
+  const tbody=document.getElementById('v-tbody');
+  const empty=document.getElementById('v-empty');
+  const summary=document.getElementById('v-summary');
 
-  // Summary
-  const totalReceita = vs.reduce((s,v)=>s+v.total,0);
-  const totalQtd = vs.reduce((s,v)=>s+v.qtd,0);
-  if (summary) {
-    summary.innerHTML = vs.length > 0 ? `
-      <span class="venda-tag">${vs.length} venda${vs.length!==1?'s':''}</span>
-      <span class="venda-tag">${totalQtd} unidades</span>
-      <span class="venda-tag">${R(totalReceita)} total</span>
-    ` : '';
-  }
+  const totalReceita=vs.filter(v=>v.pago==='sim').reduce((s,v)=>s+v.total,0);
+  const totalPendente=vs.filter(v=>v.pago!=='sim').reduce((s,v)=>s+v.total,0);
+  const naoFeito=vs.filter(v=>(v.feito||'nao')==='nao').length;
+  const naoEntregue=vs.filter(v=>(v.entregue||'nao')==='nao'&&(v.feito||'nao')==='sim').length;
 
-  if (!vs.length) { tbody.innerHTML=''; empty.style.display='block'; return; }
+  if (summary) summary.innerHTML = `
+    <span class="venda-tag">${vs.length} pedido${vs.length!==1?'s':''}</span>
+    <span class="venda-tag" style="background:var(--green-light);color:var(--green)">${R(totalReceita)} pago</span>
+    ${totalPendente>0?`<span class="venda-tag" style="background:#fee2e2;color:#dc2626">${R(totalPendente)} em aberto</span>`:''}
+    ${naoFeito>0?`<span class="venda-tag" style="background:#fef3c7;color:#d97706">${naoFeito} p/ fazer</span>`:''}
+    ${naoEntregue>0?`<span class="venda-tag" style="background:#dbeafe;color:#1d4ed8">${naoEntregue} p/ entregar</span>`:''}
+  `;
+
+  if (!vs.length){tbody.innerHTML='';empty.style.display='block';return;}
   empty.style.display='none';
 
-  tbody.innerHTML = vs.map(v => `<tr>
-    <td class="mc">${v.data||'—'}</td>
-    <td>${v.cliente||'—'}</td>
-    <td><strong>${v.produto}</strong></td>
-    <td class="mc">${v.qtd}</td>
-    <td class="mc">${R(v.valor)}</td>
-    <td class="mc" style="color:var(--green);font-weight:600">${R(v.total)}</td>
-    <td style="font-size:.75rem;color:var(--muted)">${v.pedNome||'—'}</td>
+  tbody.innerHTML=vs.map(v=>`<tr style="${(v.feito||'nao')==='sim'&&(v.entregue||'nao')==='sim'?'opacity:.6':''}">
+    <td class="mc" style="white-space:nowrap">${v.data||'—'}</td>
+    <td style="font-size:.82rem">${v.cliente||'—'}</td>
+    <td><strong style="font-size:.83rem">${v.produto}</strong></td>
+    <td class="mc" style="text-align:center">${v.qtd}</td>
+    <td class="mc">${v.valor>0?R(v.valor):'—'}</td>
+    <td class="mc" style="color:var(--green);font-weight:600">${v.total>0?R(v.total):'—'}</td>
+    <td><button onclick="toggleVendaField('${v.id}','pago')" style="background:${v.pago==='sim'?'#dcfce7':v.pago==='50'?'#fef3c7':'#fee2e2'};color:${v.pago==='sim'?'#16a34a':v.pago==='50'?'#d97706':'#dc2626'};border:none;padding:3px 8px;border-radius:100px;font-size:.7rem;font-weight:700;cursor:pointer">${v.pago==='sim'?'SIM':v.pago==='50'?'50%':'NÃO'}</button></td>
+    <td>${simNaoLabel(v,'feito')}</td>
+    <td>${simNaoLabel(v,'entregue')}</td>
+    <td style="font-size:.73rem;color:var(--muted);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${v.obs||''}">${v.obs||'—'}</td>
     <td><button class="btn-del" onclick="delVenda('${v.id}')">✕</button></td>
   </tr>`).join('');
+
+  // Update month filter options
+  const allVs = DB.vendas;
+  const months = new Set();
+  allVs.forEach(v=>{if(v.data){const p=v.data.split('/');if(p.length===3)months.add(p[2]+'-'+p[1]);}});
+  const mSel=document.getElementById('v-month-filter');
+  if(mSel){
+    const prev=mSel.value;
+    mSel.innerHTML='<option value="all">Todos</option>';
+    Array.from(months).sort().reverse().forEach(m=>{
+      const[y,mo]=m.split('-');
+      const lbl=new Date(y,parseInt(mo)-1).toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
+      mSel.innerHTML+=`<option value="${m}">${lbl}</option>`;
+    });
+    mSel.value=prev;
+  }
 }
 
 // ══════════ SLICER ANALYZER ══════════
@@ -2802,6 +3026,63 @@ function preencherCliente() {
   if (!id) return;
   const c = DB.clientes.find(cl => cl.id === id);
   if (c) document.getElementById('v-cliente').value = c.nome;
+}
+
+
+// ══════════ NOTAS ══════════
+function toggleNotas() {
+  const panel = document.getElementById('notas-panel');
+  const isOpen = panel.style.display === 'flex';
+  panel.style.display = isOpen ? 'none' : 'flex';
+  if (!isOpen) renderNotasList();
+}
+
+function addNota() {
+  const titulo = document.getElementById('nota-titulo').value.trim();
+  const texto  = document.getElementById('nota-texto').value.trim();
+  if (!texto) { toast('⚠️ Digite o texto da nota'); return; }
+  const ns = DB.notas;
+  ns.unshift({ id:uid(), titulo: titulo||'Nota', texto, data: today() });
+  DB.notas = ns;
+  document.getElementById('nota-titulo').value = '';
+  document.getElementById('nota-texto').value  = '';
+  renderNotasList();
+  updateNotasBadge();
+  toast('✅ Nota salva!');
+}
+
+function delNota(id) {
+  DB.notas = DB.notas.filter(n => n.id !== id);
+  renderNotasList();
+  updateNotasBadge();
+}
+
+function renderNotasList() {
+  const ns = DB.notas;
+  const list = document.getElementById('notas-list');
+  if (!ns.length) {
+    list.innerHTML = '<div class="empty" style="padding:24px"><span class="ei" style="font-size:1.5rem">📝</span><p>Nenhuma anotação ainda.</p></div>';
+    return;
+  }
+  list.innerHTML = ns.map(n => `
+    <div class="nota-item">
+      <button class="btn-del" onclick="delNota('${n.id}')" style="position:absolute;top:8px;right:8px;font-size:.85rem">✕</button>
+      <div class="nota-item-title">${n.titulo}</div>
+      <div class="nota-item-text">${n.texto}</div>
+      <div class="nota-item-date">${n.data}</div>
+    </div>`).join('');
+}
+
+function updateNotasBadge() {
+  const ns = DB.notas;
+  const badge = document.getElementById('notas-badge');
+  if (!badge) return;
+  if (ns.length > 0) {
+    badge.textContent = ns.length > 9 ? '9+' : ns.length;
+    badge.style.display = 'flex';
+  } else {
+    badge.style.display = 'none';
+  }
 }
 
 function renderMetas(){renderSubList();renderMetaBreakdown();calcPayoff();calcGpg();}
