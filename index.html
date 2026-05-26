@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
@@ -1416,13 +1415,17 @@ hr{border:none;border-top:1px solid var(--border);margin:12px 0}
 // Reads from localStorage (populated on login), writes to both localStorage + Firestore
 function _setAndSync(lsKey, colName, newArr, oldArr) {
   localStorage.setItem(lsKey, JSON.stringify(newArr));
-  if (!window._cloudSave) return;
-  // Detect added/updated items
-  const oldIds = new Set((oldArr||[]).map(i=>i.id));
-  const newIds = new Set((newArr||[]).map(i=>i.id));
-  newArr.forEach(item => { window._cloudSave(colName, item); });
-  // Detect deleted items
-  (oldArr||[]).forEach(item => { if(!newIds.has(item.id)) window._cloudDelete(colName, item.id); });
+  // Retry up to 5s if Firebase not ready yet
+  const doSync = (attempt) => {
+    if (!window._cloudSave) {
+      if (attempt < 10) setTimeout(() => doSync(attempt+1), 500);
+      return;
+    }
+    const newIds = new Set((newArr||[]).map(i=>i.id));
+    newArr.forEach(item => { window._cloudSave(colName, item); });
+    (oldArr||[]).forEach(item => { if(!newIds.has(item.id)) window._cloudDelete(colName, item.id); });
+  };
+  doSync(0);
 }
 
 const DB = {
