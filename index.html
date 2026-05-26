@@ -753,7 +753,7 @@ hr{border:none;border-top:1px solid var(--border);margin:12px 0}
   <div class="logo">kalcula<em>3</em>d</div>
   <nav>
     <button class="active" onclick="showTab('dashboard')">Dashboard</button>
-    <button onclick="showTab('pedidos')">Pedidos</button>
+    <button onclick="showTab('pedidos')">Produções</button>
     <button onclick="showTab('calcular')">Calcular</button>
     <button onclick="showTab('metas')">Metas & Gastos</button>
     <button onclick="showTab('impressoras')">Impressoras</button>
@@ -793,7 +793,7 @@ hr{border:none;border-top:1px solid var(--border);margin:12px 0}
 
 <!-- ═══ PEDIDOS ═══ -->
 <div id="tab-pedidos" class="tab">
-  <div class="ph"><h1>Pedidos</h1><p>Gerencie status e acompanhe cada pedido</p></div>
+  <div class="ph"><h1>Produções</h1><p>Histórico de cálculos — consulte custos para reimpressões</p></div>
   <div class="fr">
     <span class="fr-lbl">Mês</span>
     <select id="ped-month" onchange="renderPedidos()" style="width:auto"><option value="all">Todos</option></select>
@@ -810,14 +810,13 @@ hr{border:none;border-top:1px solid var(--border);margin:12px 0}
     <button class="btn btn-sm" onclick="showTab('calcular')">+ Novo cálculo</button>
   </div>
 
-  <!-- SUMMARY CARDS BY STATUS -->
-  <div id="ped-status-summary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin-bottom:18px"></div>
+
 
   <div class="card">
     <div class="tbl-wrap"><table>
       <thead><tr>
-        <th>Pedido</th><th>Data</th><th>Status</th><th>Impressora</th>
-        <th>Custo Total</th><th>Cobrado</th><th>Lucro Real</th><th>Estoque</th><th></th>
+        <th>Modelo / Lote</th><th>Data</th><th>Impressora</th><th>Un.</th>
+        <th>Custo Un.</th><th>Custo Total</th><th>Preço Sugerido</th><th>Markup</th><th></th>
       </tr></thead>
       <tbody id="ped-tbody"></tbody>
     </table></div>
@@ -1213,9 +1212,7 @@ hr{border:none;border-top:1px solid var(--border);margin:12px 0}
             <option value="sim">Sim</option>
           </select>
         </div>
-        <div class="fg"><label>Impressora</label>
-          <select id="v-impressora"><option value="">— —</option></select>
-        </div>
+
       </div>
       <div class="fg" style="margin-bottom:10px">
         <label>Observação</label>
@@ -2591,7 +2588,7 @@ function addVenda() {
   const pago     = document.getElementById('v-pago').value;
   const feito    = document.getElementById('v-feito').value;
   const entregue = document.getElementById('v-entregue').value;
-  const impressora = document.getElementById('v-impressora')?.value||'';
+  const impressora = '';
   const obs      = document.getElementById('v-obs')?.value.trim()||'';
 
   if (!data||!produto) { toast('⚠️ Preencha data e produto'); return; }
