@@ -3109,6 +3109,75 @@ function updateNotasBadge() {
   }
 }
 
+
+function editarProducao(id) {
+  const ps = DB.pedidos;
+  const p = ps.find(pr=>pr.id===id);
+  if (!p) return;
+
+  showTab('calcular');
+
+  setTimeout(() => {
+    const setVal = (elId, val) => { const el=document.getElementById(elId); if(el&&val!=null) el.value=val; };
+    setVal('c-nome', p.nome);
+    setVal('c-data', p.data);
+    setVal('c-unidades', p.unidades||1);
+    setVal('c-horas', p.horas||'');
+    setVal('c-watts', p.watts||'');
+    setVal('c-kwh', p.kwh||'');
+    setVal('c-falhas', p.falhas||'');
+    setVal('c-vida', p.vida||'');
+    setVal('c-maquina', p.maquina||'');
+    setVal('c-markup', p.markup||5);
+    setVal('c-anuncio', p.anuncio||'');
+
+    // Select printer if saved
+    if (p.impressoraNome) {
+      const impSel = document.getElementById('c-impressora');
+      if (impSel) {
+        Array.from(impSel.options).forEach(o => {
+          if (o.text.startsWith(p.impressoraNome)) impSel.value = o.value;
+        });
+        loadPrinter();
+      }
+    }
+
+    // Fill filamentos
+    if (p.filamentos && p.filamentos.length > 0) {
+      filRows = [];
+      document.getElementById('fil-rows').innerHTML = '';
+      const fs = DB.fils;
+      p.filamentos.forEach((f, i) => {
+        const rowId = uid();
+        filRows.push(rowId);
+        renderFilRows();
+        setTimeout(() => {
+          const sel = document.getElementById('fsel-'+rowId);
+          const gEl = document.getElementById('fg-'+rowId);
+          if (sel) {
+            const match = fs.find(fil => fil.nome === f.nome);
+            if (match) sel.value = match.id;
+          }
+          if (gEl) gEl.value = f.gramas||'';
+          calcular();
+        }, 80*(i+1));
+      });
+    }
+
+    window._editingPedidoId = id;
+
+    // Update save button
+    const saveBtn = document.querySelector('[onclick="salvarPedido()"]');
+    if (saveBtn) {
+      saveBtn.textContent = '💾 Atualizar produção';
+      saveBtn.style.background = 'var(--blue)';
+    }
+
+    toast('📋 Cálculo carregado — edite e salve!');
+    calcular();
+  }, 300);
+}
+
 function renderMetas(){renderSubList();renderMetaBreakdown();calcPayoff();calcGpg();}
 
 // ══════════ CONFIG ══════════
