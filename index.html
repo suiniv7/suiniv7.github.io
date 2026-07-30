@@ -560,6 +560,17 @@ hr{border:none;border-top:1px solid var(--border);margin:12px 0}
   transition:all .2s;
 }
 #calc-fab:hover { transform:translateY(-2px); box-shadow:0 6px 24px rgba(200,75,31,.5); }
+
+/* EDIT CLIENT MODAL */
+#edit-cl-modal {
+  position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;
+  display:none;align-items:center;justify-content:center;padding:20px;
+}
+#edit-cl-modal.show { display:flex; }
+#edit-cl-box {
+  background:var(--card);border-radius:14px;padding:24px;
+  width:100%;max-width:480px;box-shadow:0 20px 60px rgba(0,0,0,.2);
+}
 </style>
 
 <!-- Firebase -->
@@ -850,30 +861,6 @@ hr{border:none;border-top:1px solid var(--border);margin:12px 0}
             <div class="fg"><label>Nome / modelo</label><input type="text" id="c-nome" placeholder="Ex: Funko Spider-Man"></div>
             <div class="fg"><label>Data</label><input type="text" id="c-data" placeholder="DD/MM/AAAA"></div>
             <div class="fg"><label>Unidades produzidas</label><input type="number" id="c-unidades" value="1" min="1" oninput="calcular()"></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- SLICER ANALYZER -->
-      <div class="section">
-        <div class="sec-head">📸 Analisar imagem do slicer <span style="font-size:.65rem;color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0">opcional — preenche campos automaticamente</span></div>
-        <div class="sec-body">
-          <div class="slicer-drop" id="slicer-drop"
-            ondragover="event.preventDefault();this.classList.add('dragover')"
-            ondragleave="this.classList.remove('dragover')"
-            ondrop="handleSlicerDrop(event)">
-            <input type="file" accept="image/*" onchange="handleSlicerFile(this.files[0])">
-            <span class="slicer-drop-icon">🖼️</span>
-            <div class="slicer-drop-lbl">Arraste um print do Bambu Studio aqui</div>
-            <div class="slicer-drop-sub">ou clique para selecionar — JPG, PNG, etc.</div>
-          </div>
-          <img id="slicer-preview" class="slicer-preview">
-          <div class="slicer-analyzing" id="slicer-analyzing">
-            <span class="spin">⚙️</span> Analisando imagem com IA...
-          </div>
-          <div class="slicer-result" id="slicer-result">
-            <div class="slicer-result-title">✅ Dados extraídos — campos preenchidos automaticamente</div>
-            <div id="slicer-result-fields"></div>
           </div>
         </div>
       </div>
@@ -1416,6 +1403,28 @@ hr{border:none;border-top:1px solid var(--border);margin:12px 0}
     <input type="text" id="nota-titulo" placeholder="Título da nota..." style="width:100%;margin-bottom:6px">
     <textarea id="nota-texto" placeholder="Digite sua anotação..."></textarea>
     <button class="btn btn-sm" style="width:100%;margin-top:6px" onclick="addNota()">+ Adicionar nota</button>
+  </div>
+</div>
+
+
+<!-- EDIT CLIENT MODAL -->
+<div id="edit-cl-modal" onclick="if(event.target===this)closeEditCliente()">
+  <div id="edit-cl-box">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
+      <span style="font-weight:800;font-size:1rem">Editar Cliente</span>
+      <button class="btn-del" onclick="closeEditCliente()" style="font-size:1.2rem">✕</button>
+    </div>
+    <input type="hidden" id="edit-cl-id">
+    <div class="fgrid" style="margin-bottom:14px">
+      <div class="fg"><label>Nome</label><input type="text" id="edit-cl-nome"></div>
+      <div class="fg"><label>Telefone / WhatsApp</label><input type="text" id="edit-cl-tel"></div>
+      <div class="fg"><label>Instagram / Contato</label><input type="text" id="edit-cl-insta"></div>
+      <div class="fg"><label>Observações</label><input type="text" id="edit-cl-obs"></div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn" onclick="saveEditCliente()">Salvar</button>
+      <button class="btn btn-ghost" onclick="closeEditCliente()">Cancelar</button>
+    </div>
   </div>
 </div>
 
@@ -2721,13 +2730,17 @@ function renderVendas() {
   const mSel=document.getElementById('v-month-filter');
   if(mSel){
     const prev=mSel.value;
+    const now=new Date();
+    const curMonth=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
     mSel.innerHTML='<option value="all">Todos</option>';
     Array.from(months).sort().reverse().forEach(m=>{
       const[y,mo]=m.split('-');
       const lbl=new Date(y,parseInt(mo)-1).toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
       mSel.innerHTML+=`<option value="${m}">${lbl}</option>`;
     });
-    mSel.value=prev;
+    // Keep previous selection or default to current month if available
+    if(prev && prev!=='all') mSel.value=prev;
+    else if(months.has(curMonth)) mSel.value=curMonth;
   }
 }
 
@@ -2957,6 +2970,41 @@ Extraia os números exatamente como aparecem na tabela. Use null apenas se o pai
 
 
 // ══════════ CLIENTES ══════════
+
+function openEditCliente(id) {
+  const c = DB.clientes.find(cl=>cl.id===id);
+  if (!c) return;
+  document.getElementById('edit-cl-id').value   = id;
+  document.getElementById('edit-cl-nome').value  = c.nome||'';
+  document.getElementById('edit-cl-tel').value   = c.tel||'';
+  document.getElementById('edit-cl-insta').value = c.insta||'';
+  document.getElementById('edit-cl-obs').value   = c.obs||'';
+  document.getElementById('edit-cl-modal').classList.add('show');
+}
+
+function closeEditCliente() {
+  document.getElementById('edit-cl-modal').classList.remove('show');
+}
+
+function saveEditCliente() {
+  const id   = document.getElementById('edit-cl-id').value;
+  const nome = document.getElementById('edit-cl-nome').value.trim();
+  if (!nome) { toast('⚠️ Nome obrigatório'); return; }
+  const cs  = DB.clientes;
+  const idx = cs.findIndex(c=>c.id===id);
+  if (idx===-1) return;
+  cs[idx] = { ...cs[idx],
+    nome,
+    tel:   document.getElementById('edit-cl-tel').value.trim(),
+    insta: document.getElementById('edit-cl-insta').value.trim(),
+    obs:   document.getElementById('edit-cl-obs').value.trim(),
+  };
+  DB.clientes = cs;
+  closeEditCliente();
+  renderClientes();
+  toast('✅ Cliente atualizado!');
+}
+
 function addCliente() {
   const nome  = document.getElementById('cl-nome').value.trim();
   const tel   = document.getElementById('cl-tel').value.trim();
@@ -2997,7 +3045,10 @@ function renderClientes() {
     const ultimaCompra = cVendas.length > 0 ? cVendas[0].data : null;
     return `
     <div class="card" style="position:relative">
-      <button class="btn-del" onclick="delCliente('${c.id}')" style="position:absolute;top:10px;right:10px">✕</button>
+      <div style="position:absolute;top:10px;right:10px;display:flex;gap:4px">
+        <button class="btn btn-sm btn-ghost" onclick="openEditCliente('${c.id}')" style="padding:4px 8px;font-size:.7rem">✏️</button>
+        <button class="btn-del" onclick="delCliente('${c.id}')">✕</button>
+      </div>
       <div class="card-body">
         <div style="font-weight:800;font-size:1rem;margin-bottom:4px;padding-right:24px">👤 ${c.nome}</div>
         ${c.tel   ? `<div style="font-size:.78rem;color:var(--muted);margin-bottom:2px">📱 ${c.tel}</div>` : ''}
