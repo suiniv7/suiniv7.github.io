@@ -815,21 +815,10 @@ hr{border:none;border-top:1px solid var(--border);margin:12px 0}
 
 <!-- ═══ PEDIDOS ═══ -->
 <div id="tab-pedidos" class="tab">
-  <div class="ph"><h1>Produções</h1><p>Histórico de cálculos — consulte custos para reimpressões</p></div>
+  <div class="ph"><h1>Produções</h1><p>Seus orçamentos e cálculos salvos</p></div>
   <div class="fr">
     <span class="fr-lbl">Mês</span>
     <select id="ped-month" onchange="renderPedidos()" style="width:auto"><option value="all">Todos</option></select>
-    <span class="fr-lbl" style="margin-left:8px">Status</span>
-    <select id="ped-status-filter" onchange="renderPedidos()" style="width:auto">
-      <option value="all">Todos</option>
-      <option value="pendente">Pendente</option>
-      <option value="confirmado">Confirmado</option>
-      <option value="produzindo">Produzindo</option>
-      <option value="pronto">Pronto</option>
-      <option value="entregue">Entregue</option>
-      <option value="cancelado">Cancelado</option>
-    </select>
-    <button class="btn btn-sm" onclick="showTab('calcular')">+ Novo cálculo</button>
   </div>
 
 
@@ -2047,40 +2036,19 @@ function renderPedidos(){
   if(!list.length){tbody.innerHTML='';empty.style.display='block';return;}
   empty.style.display='none';
 
-  tbody.innerHTML=list.map(p=>{
-    const st = p.status||'orcamento';
-    const cfg = STATUS_CONFIG[st];
-    const cls=(p.lucroRealLiq??p.lucroBruto)>=0?'profit':'loss';
-    const lucroMostrar=p.lucroRealLiq??p.lucroBruto;
-    const rowCls = st==='entregue'?'ped-row-entregue':st==='cancelado'?'ped-row-cancelado':'';
-    const estoqueInfo = st==='entregue'
-      ? `<span style="font-size:.68rem;color:var(--green)">✓ descontado</span>`
-      : `<span style="font-size:.68rem;color:var(--muted)">pendente</span>`;
-    return`<tr class="${rowCls}">
-      <td><strong>${p.nome}</strong><br><span style="font-size:.7rem;color:var(--muted)">${p.unidades||1} un.</span></td>
-      <td class="mc">${p.data||'—'}</td>
-      <td>
-        <div style="position:relative;display:inline-block">
-          <button class="status-badge ${cfg.cls}" onclick="openStatusMenu('${p.id}',this)">
-            ${cfg.emoji} ${cfg.label} ▾
-          </button>
-        </div>
-      </td>
-      <td style="font-size:.76rem">${p.impressoraNome||'—'}</td>
-      <td class="mc">${R(p.custoTotal)}</td>
-      <td class="mc"><div style="display:flex;align-items:center;gap:4px"><span style="color:${p.precoFinal&&p.precoFinal!==p.precoConsumidor?'var(--blue)':'inherit'}">${R(p.precoFinal||p.precoConsumidor)}</span>
-          <button onclick="editarValorCobrado('${p.id}')" title="Editar valor cobrado" style="background:none;border:none;cursor:pointer;font-size:.75rem;color:var(--muted);padding:2px 4px;border-radius:4px" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--muted)'">✏️</button>
-        </div></td>
-      <td class="${cls}">${R(lucroMostrar)}</td>
-      <td>
-        ${p.estoqueDescontado
-          ? '<span style="font-size:.68rem;color:var(--green);font-weight:600">✓ descontado</span>'
-          : `<button class="btn btn-sm" style="background:rgba(26,107,60,.1);color:var(--green);border:1px solid rgba(26,107,60,.2);font-size:.68rem;padding:4px 8px" onclick="descontarEstoque('${p.id}')">−📦</button>`
-        }
-      </td>
-      <td><button class="btn-del" onclick="delPedido('${p.id}')">✕</button></td>
-    </tr>`;
-  }).join('');
+  tbody.innerHTML=list.map(p=>`<tr>
+    <td><strong>${p.nome}</strong><br><span style="font-size:.7rem;color:var(--muted)">${p.unidades||1} un.</span></td>
+    <td class="mc">${p.data||'—'}</td>
+    <td style="font-size:.76rem;color:var(--muted)">${p.impressoraNome||'Manual'}</td>
+    <td class="mc">${R(p.custoUn)}</td>
+    <td class="mc">${R(p.custoTotal)}</td>
+    <td class="mc" style="color:var(--blue);font-weight:600">${R(p.precoConsumidor)}</td>
+    <td class="mc">${Number(p.markup||0).toFixed(2)}×</td>
+    <td style="display:flex;gap:5px;align-items:center">
+      <button class="btn btn-sm btn-ghost" onclick="editarProducao('${p.id}')" style="padding:4px 8px;font-size:.7rem">✏️</button>
+      <button class="btn-del" onclick="delPedido('${p.id}')">✕</button>
+    </td>
+  </tr>`).join('');
 }
 function delPedido(id){
   if(!confirm('Remover este pedido?'))return;
