@@ -837,7 +837,7 @@ hr{border:none;border-top:1px solid var(--border);margin:12px 0}
   <div class="card">
     <div class="tbl-wrap"><table>
       <thead><tr>
-        <th>Modelo / Lote</th><th>Data</th><th>Impressora</th><th>Un.</th>
+        <th>Modelo / Lote</th><th>Data</th><th>Impressora</th>
         <th>Custo Un.</th><th>Custo Total</th><th>Preço Sugerido</th><th>Markup</th><th></th>
       </tr></thead>
       <tbody id="ped-tbody"></tbody>
@@ -1157,7 +1157,7 @@ hr{border:none;border-top:1px solid var(--border);margin:12px 0}
         <div class="fg"><label>Cor visual</label><input type="color" id="f-hex" value="#ffffff"></div>
         <div class="fg"><label>Peso do rolo (g)</label><input type="number" id="f-peso" placeholder="1000"></div>
         <div class="fg"><label>Valor pago (R$)</label><input type="number" id="f-valor" placeholder="89.90" step=".01"></div>
-        <div class="fg"><label>Gramas em estoque</label><input type="number" id="f-estoque" placeholder="igual ao peso do rolo"></div>
+
       </div>
       <div style="margin-top:13px"><button class="btn" onclick="addFilamento()">Adicionar</button></div>
     </div>
@@ -1688,13 +1688,12 @@ function addFilamento() {
   const hex    = document.getElementById('f-hex').value;
   const peso   = parseFloat(document.getElementById('f-peso').value);
   const valor  = parseFloat(document.getElementById('f-valor').value);
-  const estoqueEl = document.getElementById('f-estoque');
-  const estoque = estoqueEl.value ? parseFloat(estoqueEl.value) : peso;
+  const estoque = peso;
   if(!nome||!peso||!valor){toast('⚠️ Preencha nome, peso e valor');return;}
   const fs=DB.fils;
   fs.push({id:uid(),nome,tipo,cor,hex,peso,valor,gprice:valor/peso,estoque});
   DB.fils=fs;
-  ['f-nome','f-cor','f-peso','f-valor','f-estoque'].forEach(id=>document.getElementById(id).value='');
+  ['f-nome','f-cor','f-peso','f-valor'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('f-hex').value='#ffffff';
   renderFils(); rebuildCalcFilSelects(); toast('✅ Filamento adicionado!');
 }
@@ -1706,12 +1705,7 @@ function renderFils() {
   if(!fs.length){cards.innerHTML='';empty.style.display='block';return;}
   empty.style.display='none';
   const bc=t=>{const m={PLA:'pla','PLA+':'pla',ABS:'abs',PETG:'petg',TPU:'tpu'};return'badge badge-'+(m[t]||'other');};
-  cards.innerHTML=fs.map(f=>{
-    const estoque = f.estoque ?? f.peso;
-    const pct = f.peso > 0 ? Math.min((estoque/f.peso)*100,100) : 0;
-    const eClass = pct > 40 ? 'estoque-ok' : pct > 15 ? 'estoque-med' : 'estoque-low';
-    const baixo = pct <= 15;
-    return `
+  cards.innerHTML=fs.map(f=>`
     <div class="fil-card">
       <button class="btn-del" onclick="delFil('${f.id}')" style="position:absolute;top:8px;right:8px">✕</button>
       <div class="fil-card-name"><span class="color-dot" style="background:${f.hex}"></span>${f.nome}</div>
@@ -1720,14 +1714,9 @@ function renderFils() {
         <div class="fil-cs"><span>Cor</span><span>${f.cor||'—'}</span></div>
         <div class="fil-cs"><span>Peso rolo</span><span>${f.peso}g</span></div>
         <div class="fil-cs"><span>Valor pago</span><span>${R(f.valor)}</span></div>
-        <div class="fil-cs"><span>Em estoque</span><span style="color:${baixo?'var(--accent)':'inherit'};font-weight:${baixo?700:400}">${estoque.toFixed(0)}g</span></div>
       </div>
-      <div class="estoque-bar"><div class="estoque-fill ${eClass}" style="width:${pct}%"></div></div>
-      <div style="font-size:.67rem;color:var(--muted);margin-top:3px">${pct.toFixed(0)}% do rolo restante</div>
-      ${baixo?`<div class="alerta-estoque">⚠️ Estoque baixo! Menos de 15% restante.</div>`:''}
       <div class="fil-gprice">${f.gprice.toFixed(4).replace('.',',')} R$/g</div>
-    </div>`;
-  }).join('');
+    </div>`).join('');
 }
 
 // ══════════ CALCULADORA ══════════
